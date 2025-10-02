@@ -5,12 +5,16 @@ import { Input } from '@/components/ui/input';
 import { useActivityStore } from '@/lib/activityStore';
 import { Music2, Clock, Plus, Target, Flame } from 'lucide-react';
 import Levels from '@/components/Levels';
+import { DailyGoalGauge } from '@/components/DailyGoalGauge';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function MusicTemplatePage({ slug, name }: { slug: string; name: string }) {
   const [showAddHours, setShowAddHours] = useState(false);
   const [hoursToAdd, setHoursToAdd] = useState('');
   const addCustomHours = useActivityStore((s) => s.addCustomHours);
   const entry = useActivityStore((s) => s.getCustomActivity(slug));
+  const setCustomDailyGoal = useActivityStore((s) => s.setCustomDailyGoal);
+  const addCustomTodayMinutes = useActivityStore((s) => s.addCustomTodayMinutes);
   const data = entry?.data;
 
   const level = (() => {
@@ -43,9 +47,35 @@ export default function MusicTemplatePage({ slug, name }: { slug: string; name: 
                 <p className="text-gray-600 mt-1">Track your music practice</p>
               </div>
             </div>
-            <Button className="flex items-center gap-2" onClick={() => setShowAddHours(true)}>
-              <Plus className="w-4 h-4" /> Add Hours
-            </Button>
+            <Dialog open={showAddHours} onOpenChange={setShowAddHours}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" /> Add Hours
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add {name} Hours</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Hours practiced</label>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      placeholder="e.g., 1.5"
+                      value={hoursToAdd}
+                      onChange={(e) => setHoursToAdd(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleAddHours} className="bg-purple-600 hover:bg-purple-700">Add Hours</Button>
+                  <Button variant="outline" onClick={() => setShowAddHours(false)}>Cancel</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
@@ -104,6 +134,16 @@ export default function MusicTemplatePage({ slug, name }: { slug: string; name: 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           <div className="md:col-span-2 lg:col-span-2">
             <Levels variant="oud" currentLevel={level} />
+          </div>
+          <div className="md:col-span-2 lg:col-span-2">
+            <DailyGoalGauge
+              currentHours={data?.totalHours || 0}
+              dailyGoalMinutes={data?.dailyGoalMinutes || 30}
+              todayMinutes={data?.todayDate === new Date().toDateString() ? (data?.todayMinutes || 0) : 0}
+              onUpdateDailyGoal={(minutes) => setCustomDailyGoal(slug, minutes)}
+              onUpdateTodayMinutes={(minutes) => addCustomTodayMinutes(slug, minutes - (data?.todayDate === new Date().toDateString() ? (data?.todayMinutes || 0) : 0))}
+              variant="music"
+            />
           </div>
         </div>
       </div>

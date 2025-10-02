@@ -5,12 +5,18 @@ import { Input } from '@/components/ui/input';
 import { useActivityStore } from '@/lib/activityStore';
 import { Music2, Clock, Plus, Target, Flame } from 'lucide-react';
 import Levels from '@/components/Levels';
+import { DailyGoalGauge } from '@/components/DailyGoalGauge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Oud() {
 	const [showAddHours, setShowAddHours] = useState(false);
 	const [hoursToAdd, setHoursToAdd] = useState('');
 	const { oud, addHours } = useActivityStore();
+	const setActivityTotalHours = useActivityStore((s) => s.setActivityTotalHours);
+	const setDailyGoal = useActivityStore((s) => s.setDailyGoal);
+	const addTodayMinutes = useActivityStore((s) => s.addTodayMinutes);
+	const [editTotalOpen, setEditTotalOpen] = useState(false);
+	const [manualTotal, setManualTotal] = useState('');
 
 	// Derive Oud level dynamically from total hours based on provided thresholds
 	const oudLevel =
@@ -19,7 +25,8 @@ export default function Oud() {
 		oud.totalHours >= 600 ? 5 :
 		oud.totalHours >= 300 ? 4 :
 		oud.totalHours >= 150 ? 3 :
-		oud.totalHours >= 60 ? 2 :
+		oud.totalHours >= 60 ? 3 :
+		oud.totalHours >= 20 ? 2 :
 		1;
 
 	const handleAddHours = () => {
@@ -28,6 +35,14 @@ export default function Oud() {
 			addHours('oud', hours);
 			setHoursToAdd('');
 			setShowAddHours(false);
+		}
+	};
+
+	const handleEditTotal = () => {
+		const hours = parseFloat(manualTotal);
+		if (hours >= 0) {
+			setActivityTotalHours('oud', hours);
+			setEditTotalOpen(false);
 		}
 	};
 
@@ -87,7 +102,16 @@ export default function Oud() {
 						<div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500 opacity-5" />
 						<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
 							<CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-							<Music2 className="h-4 w-4 text-purple-600" />
+							<div className="flex items-center gap-2">
+								<Music2 className="h-4 w-4 text-purple-600" />
+								<button
+									className="text-xs text-gray-500 hover:text-gray-700 underline"
+									onClick={() => { setManualTotal(String(oud.totalHours)); setEditTotalOpen(true); }}
+									title="Edit total hours"
+								>
+									Edit
+								</button>
+							</div>
 						</CardHeader>
 						<CardContent>
 							<div className="text-3xl font-bold">{oud.totalHours}h</div>
@@ -131,13 +155,53 @@ export default function Oud() {
 									</CardContent>
 								</Card>
 				</div>
-				{/* Levels - Generic template (spans two cards) */}
+				{/* Levels and Daily Goal */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
 					<div className="md:col-span-2 lg:col-span-2">
 						<Levels variant="oud" currentLevel={oudLevel} />
 					</div>
+					<div className="md:col-span-2 lg:col-span-2">
+						<DailyGoalGauge
+							currentHours={oud.totalHours}
+							dailyGoalMinutes={oud.dailyGoalMinutes || 30}
+							todayMinutes={oud.todayDate === new Date().toDateString() ? (oud.todayMinutes || 0) : 0}
+							onUpdateDailyGoal={(minutes) => setDailyGoal('oud', minutes)}
+							onUpdateTodayMinutes={(minutes) => addTodayMinutes('oud', minutes - (oud.todayDate === new Date().toDateString() ? (oud.todayMinutes || 0) : 0))}
+							variant="music"
+						/>
+					</div>
 				</div>
 			</div>
+			
+			{/* Edit Total Hours Dialog */}
+			<Dialog open={editTotalOpen} onOpenChange={setEditTotalOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Edit Total Hours</DialogTitle>
+					</DialogHeader>
+					<div className="space-y-4">
+						<div>
+							<label className="text-sm font-medium">Total Hours</label>
+							<Input
+								type="number"
+								value={manualTotal}
+								onChange={(e) => setManualTotal(e.target.value)}
+								placeholder="Enter total hours"
+								step="0.01"
+								min="0"
+							/>
+						</div>
+						<div className="flex gap-2 justify-end">
+							<Button variant="outline" onClick={() => setEditTotalOpen(false)}>
+								Cancel
+							</Button>
+							<Button onClick={handleEditTotal}>
+								Save
+							</Button>
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }

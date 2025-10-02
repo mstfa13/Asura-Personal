@@ -38,10 +38,8 @@ export default function Sidebar() {
   const customMap = useActivityStore((s) => s.customActivities);
   const custom = useMemo(() => Object.entries(customMap).map(([slug, v]) => ({ slug, ...v })), [customMap]);
   const addCustom = useActivityStore((s) => s.addCustomActivity);
-  const setMinimal = useActivityStore((s) => s.hydrateFromServer);
   const deleteCustom = useActivityStore((s) => s.deleteCustomActivity);
   const hidden = useActivityStore((s) => s.hiddenActivities);
-  const minimal = useActivityStore((s) => s.minimalMode);
   const hideCore = useActivityStore((s) => s.hideActivity);
   const restoreCore = useActivityStore((s) => s.restoreActivity);
 
@@ -77,47 +75,48 @@ export default function Sidebar() {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
-            {/* Core activities */}
+            {/* All activities (core + custom) unified */}
             {navigation
-              .filter((item) => !minimal || item.href === '/' || item.href === '/daily-activities')
-              .filter((item) => !('key' in item && hidden[(item as any).key]))
+              .filter(item => item.name !== 'Settings' && (!('key' in item) || !hidden[(item as any).key]))
               .map((item) => {
-              const isActive = location.pathname === item.href;
-              const canDelete = 'key' in item; // only core trackables
-              return (
-                <div key={item.name} className="flex items-center justify-between group">
-                  <Link
-                    to={item.href}
-                    onClick={() => setIsOpen(false)}
-                    className={cn(
-                      "flex items-center flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200",
-                      isActive
-                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    )}
-                  >
-                    <item.icon className="w-5 h-5 mr-3" />
-                    {item.name}
-                  </Link>
-                  {canDelete && (
-                    <button
-                      className="ml-2 p-2 rounded hover:bg-gray-100 text-gray-400 hover:text-red-600"
-                      title="Delete"
-                      onClick={() => {
-                        const key = (item as any).key as 'boxing'|'gym'|'oud'|'spanish'|'german';
-                        if (!confirm(`Hide activity \"${item.name}\"? You can restore it later from Add Activity.`)) return;
-                        hideCore(key);
-                        if (isActive) window.location.href = '/';
-                      }}
+                const href = item.href;
+                const isActive = location.pathname === href;
+                const Icon = item.icon;
+                
+                return (
+                  <div key={item.name} className="flex items-center justify-between group">
+                    <Link
+                      to={href}
+                      onClick={() => setIsOpen(false)}
+                      className={cn(
+                        "flex items-center flex-1 px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200",
+                        isActive
+                          ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
                     >
-                      ×
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+                      <Icon className="w-5 h-5 mr-3" />
+                      {item.name}
+                    </Link>
+                    {'key' in item && (
+                      <button
+                        className="ml-2 p-2 rounded hover:bg-gray-100 text-gray-400 hover:text-red-600"
+                        title="Delete"
+                        onClick={() => {
+                          const key = (item as any).key as 'boxing'|'gym'|'oud'|'spanish'|'german';
+                          if (!confirm(`Hide activity "${item.name}"? You can restore it later from Add Activity.`)) return;
+                          hideCore(key);
+                          if (isActive) window.location.href = '/';
+                        }}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
 
-            {/* Inline custom activities within list */}
+            {/* Custom activities mixed with main ones */}
             {custom.map((c) => {
               const href = `/activity/${c.slug}`;
               const isActive = location.pathname === href;
@@ -140,7 +139,7 @@ export default function Sidebar() {
                     className="ml-2 p-2 rounded hover:bg-gray-100 text-gray-400 hover:text-red-600"
                     title="Delete"
                     onClick={() => {
-                      if (!confirm(`Delete activity \"${c.name}\"?`)) return;
+                      if (!confirm(`Delete activity "${c.name}"?`)) return;
                       deleteCustom(c.slug);
                       if (isActive) {
                         window.location.href = '/';
@@ -197,8 +196,6 @@ export default function Sidebar() {
                       if (!raw) return;
                       const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                       addCustom(slug, raw, template);
-                      // Turn off minimal mode once user adds content
-                      setMinimal({ minimalMode: false });
                       setActivityName('');
                       setTemplate('none');
                       setShowAdd(false);
@@ -210,6 +207,32 @@ export default function Sidebar() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Settings at the bottom */}
+            {(() => {
+              const settingsItem = navigation.find(item => item.name === 'Settings')!;
+              const href = settingsItem.href;
+              const isActive = location.pathname === href;
+              const Icon = settingsItem.icon;
+              
+              return (
+                <div className="mt-4 pt-4 border-t">
+                  <Link
+                    to={href}
+                    onClick={() => setIsOpen(false)}
+                    className={cn(
+                      "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200",
+                      isActive
+                        ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    )}
+                  >
+                    <Icon className="w-5 h-5 mr-3" />
+                    {settingsItem.name}
+                  </Link>
+                </div>
+              );
+            })()}
           </nav>
 
           {/* Footer */}

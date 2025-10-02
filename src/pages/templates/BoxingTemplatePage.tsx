@@ -6,6 +6,7 @@ import { useActivityStore } from '@/lib/activityStore';
 import { Zap, Award, CalendarDays, Plus, Target } from 'lucide-react';
 import { LineChart, PieChart } from '@mui/x-charts';
 import Levels from '@/components/Levels';
+import { DailyGoalGauge } from '@/components/DailyGoalGauge';
 
 export default function BoxingTemplatePage({ slug, name }: { slug: string; name: string }) {
   const [showAddHours, setShowAddHours] = useState(false);
@@ -18,6 +19,8 @@ export default function BoxingTemplatePage({ slug, name }: { slug: string; name:
   const entry = useActivityStore((s) => s.getCustomActivity(slug));
   const addCustomHours = useActivityStore((s) => s.addCustomHours);
   const addCustomTapeHours = useActivityStore((s) => s.addCustomTapeHours);
+  const setCustomDailyGoal = useActivityStore((s) => s.setCustomDailyGoal);
+  const addCustomTodayMinutes = useActivityStore((s) => s.addCustomTodayMinutes);
   const data = entry?.data;
 
   const boxingLevel = (data?.totalHours ?? 0) >= 1500
@@ -228,6 +231,16 @@ export default function BoxingTemplatePage({ slug, name }: { slug: string; name:
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="md:col-span-2 lg:col-span-2">
             <Levels variant="boxing" currentLevel={boxingLevel} />
+          </div>
+          <div className="md:col-span-2 lg:col-span-2">
+            <DailyGoalGauge
+              currentHours={data?.totalHours || 0}
+              dailyGoalMinutes={data?.dailyGoalMinutes || 30}
+              todayMinutes={data?.todayDate === new Date().toDateString() ? (data?.todayMinutes || 0) : 0}
+              onUpdateDailyGoal={(minutes) => setCustomDailyGoal(slug, minutes)}
+              onUpdateTodayMinutes={(minutes) => addCustomTodayMinutes(slug, minutes - (data?.todayDate === new Date().toDateString() ? (data?.todayMinutes || 0) : 0))}
+              variant="boxing"
+            />
           </div>
         </div>
       </div>

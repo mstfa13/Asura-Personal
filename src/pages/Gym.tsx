@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useActivityStore } from '@/lib/activityStore';
-import { Dumbbell, Clock, Plus, Target, Flame } from 'lucide-react';
+import { Dumbbell, Clock, Target, Flame } from 'lucide-react';
 import Levels from '@/components/Levels';
 import { LineChart } from '@mui/x-charts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 export default function Gym() {
 	const [showAddHours, setShowAddHours] = useState(false);
 	const [hoursToAdd, setHoursToAdd] = useState('');
-	const { gym, addHours } = useActivityStore();
+	const { gym } = useActivityStore();
 	const setActivityTotalHours = useActivityStore((s) => s.setActivityTotalHours);
 	const [editTotalOpen, setEditTotalOpen] = useState(false);
 	const [manualTotal, setManualTotal] = useState('');
@@ -79,50 +79,7 @@ export default function Gym() {
 			[allExercises, catFilter]
 		);
 
-	const exerciseData: Record<string, Array<{ date: string; weight: number | null; reps: number | null }>> = {
-		'flat-db-press': [
-			{ date: '7-25', weight: 25, reps: 8 },
-			{ date: '8-1', weight: 27.5, reps: 8 },
-			{ date: '8-8', weight: 30, reps: 6 },
-			{ date: '8-15', weight: 30, reps: 7 },
-			{ date: '8-22', weight: 32.5, reps: 5 },
-		],
-		'flat-bpress-machine': [
-			{ date: '7-25', weight: 45, reps: 9 },
-			{ date: '8-1', weight: 50, reps: 9 },
-			{ date: '8-8', weight: 52.5, reps: 8 },
-			{ date: '8-15', weight: 55, reps: 7 },
-			{ date: '8-22', weight: 55, reps: 8 },
-		],
-		'high-low-cable-fly': [
-			{ date: '7-25', weight: 22.5, reps: 10 },
-			{ date: '8-1', weight: 25, reps: 9 },
-			{ date: '8-8', weight: 25, reps: 10 },
-			{ date: '8-15', weight: 27.5, reps: 8 },
-			{ date: '8-22', weight: 27.5, reps: 9 },
-		],
-		'tri-rope-pushdown': [
-			{ date: '7-25', weight: 40, reps: 10 },
-			{ date: '8-1', weight: 45, reps: 9 },
-			{ date: '8-8', weight: 45, reps: 10 },
-			{ date: '8-15', weight: 50, reps: 8 },
-			{ date: '8-22', weight: 50, reps: 9 },
-		],
-		'db-lateral-raises': [
-			{ date: '7-25', weight: 8, reps: 12 },
-			{ date: '8-1', weight: 10, reps: 10 },
-			{ date: '8-8', weight: 10, reps: 12 },
-			{ date: '8-15', weight: 12, reps: 10 },
-			{ date: '8-22', weight: 12, reps: 12 },
-		],
-		'shoulder-press-machine': [
-			{ date: '7-25', weight: 22.5, reps: 10 },
-			{ date: '8-1', weight: 25, reps: 8 },
-			{ date: '8-8', weight: 27.5, reps: 8 },
-			{ date: '8-15', weight: 30, reps: 6 },
-			{ date: '8-22', weight: 30, reps: 8 },
-		],
-	};
+
 
 	const [selectedExercise, setSelectedExercise] = useState<string>('');
 	// Keep selection valid when filter or list changes
@@ -148,10 +105,10 @@ export default function Gym() {
 		return vals.length ? Math.ceil(Math.max(...vals) + 2) : 10;
 	})();
 
-	const handleAddHours = () => {
+	const handleEditHours = () => {
 		const hours = parseFloat(hoursToAdd);
-		if (hours > 0) {
-			addHours('gym', hours);
+		if (Number.isFinite(hours) && hours >= 0) {
+			setActivityTotalHours('gym', hours);
 			setHoursToAdd('');
 			setShowAddHours(false);
 		}
@@ -192,8 +149,7 @@ export default function Gym() {
 						<Dialog open={showAddHours} onOpenChange={setShowAddHours}>
 							<DialogTrigger asChild>
 								<Button className="flex items-center gap-2">
-									<Plus className="w-4 h-4" />
-									Add Hours
+									Edit Hours
 								</Button>
 							</DialogTrigger>
 							<DialogContent>
@@ -202,7 +158,7 @@ export default function Gym() {
 								</DialogHeader>
 								<div className="space-y-4">
 									<div>
-										<label className="text-sm font-medium text-gray-700">Hours practiced</label>
+										<label className="text-sm font-medium text-gray-700">Set total hours</label>
 										<Input
 											type="number"
 											step="0.5"
@@ -214,7 +170,7 @@ export default function Gym() {
 									</div>
 								</div>
 								<DialogFooter>
-									<Button onClick={handleAddHours} className="bg-green-600 hover:bg-green-700">Add Hours</Button>
+									<Button onClick={handleEditHours} className="bg-green-600 hover:bg-green-700">Save</Button>
 									<Button variant="outline" onClick={() => setShowAddHours(false)}>Cancel</Button>
 								</DialogFooter>
 							</DialogContent>
@@ -617,11 +573,7 @@ export default function Gym() {
 													}}
 													height={260}
 												/>
-											) : (
-												<div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-													No data yet. Use "Add Weight" to add your first set.
-												</div>
-											)}
+											) : null}
 								</div>
 							) : (
 														<div className="overflow-x-auto">
@@ -653,6 +605,59 @@ export default function Gym() {
 														</div>
 							)}
 						</CardContent>
+
+						{/* Static grouped summary list inserted per user request */}
+						<div className="border-t px-6 pb-6 pt-4 bg-gradient-to-br from-gray-50 to-white">
+							<h4 className="text-sm font-semibold text-gray-700 mb-3">Session Summary (Manual Entry)</h4>
+							<div className="grid md:grid-cols-3 gap-6 text-xs leading-5">
+								{/* Push */}
+								<div>
+									<p className="font-medium text-blue-600 mb-1">Push</p>
+									<ul className="space-y-1 text-gray-700">
+										<li>Flat db press - 25x8r (2nd set 5r)</li>
+										<li>Flat B-Press machine - 50x9r</li>
+										<li>Incline db press - 25x8r</li>
+										<li>Incline B-Press machine - 55x10r</li>
+										<li>High to low cable fly - 25x9r</li>
+										<li>Tri rope pushdown - 45x9r</li>
+										<li>Overhead cable bar extensions - 40x9r</li>
+										<li>Db lateral raises - 10x10r</li>
+										<li>Cable lateral raises - 10x8r</li>
+										<li>Shoulder press machine - 25x8r</li>
+									</ul>
+								</div>
+								{/* Pull */}
+								<div>
+									<p className="font-medium text-green-600 mb-1">Pull</p>
+									<ul className="space-y-1 text-gray-700">
+										<li>Wide Lat pulldown - 54x10r</li>
+										<li>Narrow seated rows - 60x7r</li>
+										<li>Wide seated rows - 80x7r</li>
+										<li>Rope face pulls - 60x8r</li>
+										<li>SA Cable Rear Delt Fly - (no entry)</li>
+										<li>Bar Curls - 20x9r</li>
+										<li>Db Preacher curl - 10x7r</li>
+										<li>Behind back cable curls - 50x10r</li>
+										<li>Rope Bicep curl - 25x10r</li>
+										<li>Cable bar shrugs - 50x10r</li>
+									</ul>
+								</div>
+								{/* Leg */}
+								<div>
+									<p className="font-medium text-purple-600 mb-1">Leg</p>
+									<ul className="space-y-1 text-gray-700">
+										<li>Romanian Deadlift - (no entry)</li>
+										<li>Bar squat - 100x9r</li>
+										<li>Hack squat - 70x10r</li>
+										<li>Single Leg press - 40x10r</li>
+										<li>Leg extensions - 75x10r</li>
+										<li>Seated leg curls - 35x10r</li>
+										<li>Bar hip thrust - 35x12r</li>
+										<li>Seated Adduction machine - 100kgx10r</li>
+									</ul>
+								</div>
+							</div>
+						</div>
 					</Card>
 				</div>
 

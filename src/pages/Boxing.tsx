@@ -7,6 +7,7 @@ import { useActivityStore } from '@/lib/activityStore';
 import { Zap, Award, CalendarDays, Plus, Target } from 'lucide-react';
 import { LineChart, PieChart } from '@mui/x-charts';
 import Levels from '@/components/Levels';
+import { DailyGoalGauge } from '@/components/DailyGoalGauge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Boxing() {
@@ -17,6 +18,11 @@ export default function Boxing() {
   const [kickboxingTapeToAdd, setKickboxingTapeToAdd] = useState('');
   const [mmaTapeToAdd, setMmaTapeToAdd] = useState('');
   const { boxing, addHours, addTapeHours, addBoxingTapeEntry, updateBoxingTapeAt, deleteBoxingTapeAt, resetBoxingTape } = useActivityStore();
+  const setActivityTotalHours = useActivityStore((s) => s.setActivityTotalHours);
+  const setDailyGoal = useActivityStore((s) => s.setDailyGoal);
+  const addTodayMinutes = useActivityStore((s) => s.addTodayMinutes);
+  const [editTotalOpen, setEditTotalOpen] = useState(false);
+  const [manualTotal, setManualTotal] = useState('');
   const [tapeView, setTapeView] = useState<'chart' | 'table'>('chart');
   const [editTapeIdx, setEditTapeIdx] = useState<number | null>(null);
   const [editBoxing, setEditBoxing] = useState('');
@@ -45,6 +51,11 @@ export default function Boxing() {
   const fitnessTrend = boxing.fitnessTestTrend ?? [];
   const monthLabels = fitnessTrend.map((r) => r.date);
   const fitnessScores = fitnessTrend.map((r) => r.score);
+  
+  // Debug logging
+  console.log('Boxing data:', boxing);
+  console.log('Fitness trend:', fitnessTrend);
+  console.log('Fitness scores:', fitnessScores);
   const [fitnessView, setFitnessView] = useState<'chart' | 'table'>('chart');
   const [showAddFitness, setShowAddFitness] = useState(false);
   const [fitnessToAdd, setFitnessToAdd] = useState('');
@@ -140,7 +151,16 @@ export default function Boxing() {
             <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-orange-500 opacity-5" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              <Zap className="h-4 w-4 text-red-600" />
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-red-600" />
+                <button
+                  className="text-xs text-gray-500 hover:text-gray-700 underline"
+                  onClick={() => { setManualTotal(String(boxing.totalHours)); setEditTotalOpen(true); }}
+                  title="Edit total hours"
+                >
+                  Edit
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{Math.floor(boxing.totalHours)}h</div>
@@ -221,20 +241,26 @@ export default function Boxing() {
             <CardContent>
               {fitnessView === 'chart' ? (
                 <div className="w-full" style={{ height: 280 }}>
-                  <LineChart
-                    xAxis={[{ data: monthLabels, scaleType: 'point' }]}
-                    series={[{
-                      data: fitnessScores,
-                      label: 'Fitness Score',
-                      color: '#3b82f6',
-                      showMark: true,
-                      curve: 'monotoneX',
-                    }]}
-                    yAxis={[{ min: 0 }]}
-                    grid={{ horizontal: false, vertical: false }}
-                    sx={{ '.MuiChartsGrid-line': { display: 'none' }, '.MuiChartsLegend-root': { display: 'none' } }}
-                    height={280}
-                  />
+                  {fitnessTrend.length > 0 ? (
+                    <LineChart
+                      xAxis={[{ data: monthLabels, scaleType: 'point' }]}
+                      series={[{
+                        data: fitnessScores,
+                        label: 'Fitness Score',
+                        color: '#3b82f6',
+                        showMark: true,
+                        curve: 'monotoneX',
+                      }]}
+                      yAxis={[{ min: 0 }]}
+                      grid={{ horizontal: false, vertical: false }}
+                      sx={{ '.MuiChartsGrid-line': { display: 'none' }, '.MuiChartsLegend-root': { display: 'none' } }}
+                      height={280}
+                    />
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                      No fitness scores yet. Click "Add Score" to start tracking.
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -447,6 +473,16 @@ export default function Boxing() {
           <div className="md:col-span-2 lg:col-span-2">
             <Levels variant="boxing" currentLevel={boxingLevel} />
           </div>
+          <div className="md:col-span-2 lg:col-span-2">
+            <DailyGoalGauge
+              currentHours={boxing.totalHours}
+              dailyGoalMinutes={boxing.dailyGoalMinutes || 30}
+              todayMinutes={boxing.todayDate === new Date().toDateString() ? (boxing.todayMinutes || 0) : 0}
+              onUpdateDailyGoal={(minutes) => setDailyGoal('boxing', minutes)}
+              onUpdateTodayMinutes={(minutes) => addTodayMinutes('boxing', minutes - (boxing.todayDate === new Date().toDateString() ? (boxing.todayMinutes || 0) : 0))}
+              variant="boxing"
+            />
+          </div>
         </div>
       </div>
 
@@ -521,6 +557,39 @@ export default function Boxing() {
           <DialogFooter>
             <Button onClick={() => { if (editFitnessIdx === null) return; const s = parseFloat(editFitnessScore); updateFitnessScoreAt(editFitnessIdx, Number.isFinite(s) ? s : undefined, editFitnessDate.trim() || undefined); setEditFitnessIdx(null); setEditFitnessScore(''); setEditFitnessDate(''); }}>Save</Button>
             <Button variant="outline" onClick={() => setEditFitnessIdx(null)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit total hours dialog */}
+      <Dialog open={editTotalOpen} onOpenChange={setEditTotalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Total Hours</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Total Hours</label>
+              <Input
+                type="number"
+                step="0.1"
+                placeholder="e.g., 96.5"
+                value={manualTotal}
+                onChange={(e) => setManualTotal(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => {
+              const hours = parseFloat(manualTotal);
+              if (Number.isFinite(hours) && hours >= 0) {
+                setActivityTotalHours('boxing', hours);
+                setEditTotalOpen(false);
+                setManualTotal('');
+              }
+            }}>Save</Button>
+            <Button variant="outline" onClick={() => setEditTotalOpen(false)}>Cancel</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

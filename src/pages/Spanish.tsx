@@ -3,14 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useActivityStore } from '@/lib/activityStore';
-import { Languages, Clock, Plus, Target, Flame } from 'lucide-react';
+import { Languages, Clock, Plus, Target, Flame, Edit2 } from 'lucide-react';
 import Levels from '@/components/Levels';
+import { DailyGoalGauge } from '@/components/DailyGoalGauge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Spanish() {
   const [showAddHours, setShowAddHours] = useState(false);
   const [hoursToAdd, setHoursToAdd] = useState('');
-  const { spanish, addHours } = useActivityStore();
+  const [editTotalOpen, setEditTotalOpen] = useState(false);
+  const [manualTotal, setManualTotal] = useState('');
+  const { spanish, addHours, setActivityTotalHours } = useActivityStore();
+  const setDailyGoal = useActivityStore((s) => s.setDailyGoal);
+  const addTodayMinutes = useActivityStore((s) => s.addTodayMinutes);
   // Derive current level from hours using language thresholds similar to Levels component
   const spanishLevel = spanish.totalHours >= 1000
     ? 7
@@ -32,6 +37,19 @@ export default function Spanish() {
       setShowAddHours(false);
     }
   };
+
+  const handleEditTotal = () => {
+    const hours = parseFloat(manualTotal);
+    if (hours >= 0) {
+      setActivityTotalHours('spanish', hours);
+      setEditTotalOpen(false);
+    }
+  };
+
+  // Books read state and handler
+  const [editBooksOpen, setEditBooksOpen] = useState(false);
+  const [manualBooks, setManualBooks] = useState(spanish.booksRead?.toString() ?? '0');
+  const setBooksRead = useActivityStore((s) => s.setBooksRead);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -89,7 +107,20 @@ export default function Spanish() {
             <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 to-red-500 opacity-5" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              <Languages className="h-4 w-4 text-yellow-600" />
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setManualTotal(spanish.totalHours.toString());
+                    setEditTotalOpen(true);
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </Button>
+                <Languages className="h-4 w-4 text-yellow-600" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{spanish.totalHours}h</div>
@@ -100,14 +131,43 @@ export default function Spanish() {
           <Card className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-500 opacity-5" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Week</CardTitle>
-              <Clock className="h-4 w-4 text-orange-600" />
+              <CardTitle className="text-sm font-medium">Books Read</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setEditBooksOpen(true)} className="h-6 w-6 p-0"><Edit2 className="h-3 w-3" /></Button>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{spanish.thisWeekSessions}</div>
-              <p className="text-xs text-muted-foreground">sessions completed</p>
+              <div className="text-2xl font-bold">{spanish.booksRead ?? 0}</div>
+              <p className="text-xs text-muted-foreground">total books completed</p>
             </CardContent>
           </Card>
+      {/* Edit Books Read Dialog */}
+      <Dialog open={editBooksOpen} onOpenChange={setEditBooksOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Books Read</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Books Read</label>
+              <Input
+                type="number"
+                value={manualBooks}
+                onChange={(e) => setManualBooks(e.target.value)}
+                placeholder="Enter number of books"
+                step="1"
+                min="0"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setEditBooksOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => { setBooksRead('spanish', parseInt(manualBooks, 10) || 0); setEditBooksOpen(false); }}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
           <Card className="relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-pink-500 opacity-5" />
@@ -135,14 +195,54 @@ export default function Spanish() {
         </div>
       </div>
 
-      {/* Levels - Language template (spans two cards) */}
+      {/* Levels and Daily Goal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="md:col-span-2 lg:col-span-2">
             <Levels variant="language" currentLevel={spanishLevel} />
           </div>
+          <div className="md:col-span-2 lg:col-span-2">
+            <DailyGoalGauge
+              currentHours={spanish.totalHours}
+              dailyGoalMinutes={spanish.dailyGoalMinutes || 30}
+              todayMinutes={spanish.todayDate === new Date().toDateString() ? (spanish.todayMinutes || 0) : 0}
+              onUpdateDailyGoal={(minutes) => setDailyGoal('spanish', minutes)}
+              onUpdateTodayMinutes={(minutes) => addTodayMinutes('spanish', minutes - (spanish.todayDate === new Date().toDateString() ? (spanish.todayMinutes || 0) : 0))}
+              variant="language"
+            />
+          </div>
         </div>
       </div>
+      
+      {/* Edit Total Hours Dialog */}
+      <Dialog open={editTotalOpen} onOpenChange={setEditTotalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Total Hours</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Total Hours</label>
+              <Input
+                type="number"
+                value={manualTotal}
+                onChange={(e) => setManualTotal(e.target.value)}
+                placeholder="Enter total hours"
+                step="0.01"
+                min="0"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setEditTotalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditTotal}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

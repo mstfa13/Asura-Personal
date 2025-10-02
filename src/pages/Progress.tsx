@@ -1,11 +1,16 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useActivityStore } from '@/lib/activityStore';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Edit2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { RadarChart } from '@mui/x-charts/RadarChart';
 
 export default function Progress() {
-  const { boxing, gym, oud, spanish, german, customActivities } = useActivityStore();
+  const { boxing, gym, oud, spanish, german, customActivities, setActivityTotalHours, setCustomActivityTotalHours, hiddenActivities } = useActivityStore();
+  const [editTarget, setEditTarget] = React.useState<{ type: 'core' | 'custom'; key: string } | null>(null);
+  const [manualTotal, setManualTotal] = React.useState('');
   const customs = React.useMemo(() => Object.entries(customActivities).map(([slug, v]) => ({ slug, ...v })), [customActivities]);
 
   // Level helpers (keep consistent with individual pages)
@@ -34,27 +39,8 @@ export default function Progress() {
     if (bench >= 60 && ratio(squat) >= 1.0 && ratio(hip) >= 1.0) return 2;
     return 1;
   })();
-  // Seeded synthetic hours for radar position based on current lifts/BW snapshot
-  const levelToRange: Record<number, [number, number]> = {
-    1: [0, 20],
-    2: [20, 80],
-    3: [80, 150],
-    4: [150, 300],
-    5: [300, 600],
-    6: [600, 1000],
-    7: [1000, 1500],
-  };
-  const seed = JSON.stringify({ squat, bench, hip, bodyweight });
-  const seededRand = (() => {
-    let h = 2166136261; // FNV-1a
-    for (let i = 0; i < seed.length; i++) {
-      h ^= seed.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return ((h >>> 0) % 10000) / 10000; // 0..1
-  })();
-  const [minH, maxH] = levelToRange[gymLevelFromLifts];
-  const gymRadarHours = Math.round(minH + seededRand * (maxH - minH));
+  // Use actual gym.totalHours for radar chart
+  const gymRadarHours = Number.isFinite(gym?.totalHours) ? gym.totalHours : 0;
 
   const boxingLevel = getBoxingLevel(boxing.totalHours);
   const gymLevel = gymLevelFromLifts;
@@ -62,20 +48,28 @@ export default function Progress() {
   const spanishLevel = getLanguageLevel(spanish.totalHours);
   const germanLevel = getLanguageLevel(german.totalHours);
 
-  // Prepare MUI RadarChart data (defensive against undefined/NaN)
+  // Prepare MUI RadarChart data (defensive against undefined/NaN) - exclude hidden activities
   const toNum = (n: unknown) => {
     const x = Number(n);
     return Number.isFinite(x) ? x : 0;
   };
-  const categories = ['Boxing', 'Gym', 'Oud', 'Spanish', 'German', ...customs.map((c) => c.name)];
-  const hoursSeries = [
-    toNum(boxing?.totalHours),
-    toNum(gymRadarHours),
-    toNum(oud?.totalHours),
-    toNum(spanish?.totalHours),
-    toNum(german?.totalHours),
-    ...customs.map((c) => toNum(c.data.totalHours)),
+  
+  // Build categories and hours arrays, filtering out hidden activities
+  const coreActivities = [
+    { name: 'Boxing', key: 'boxing', hours: toNum(boxing?.totalHours) },
+    { name: 'Gym', key: 'gym', hours: toNum(gymRadarHours) },
+    { name: 'Oud', key: 'oud', hours: toNum(oud?.totalHours) },
+    { name: 'Spanish', key: 'spanish', hours: toNum(spanish?.totalHours) },
+    { name: 'German', key: 'german', hours: toNum(german?.totalHours) },
+  ].filter(activity => !hiddenActivities[activity.key]);
+  
+  const allActivities = [
+    ...coreActivities,
+    ...customs.map((c) => ({ name: c.name, hours: toNum(c.data.totalHours) })),
   ];
+  
+  const categories = allActivities.map(a => a.name);
+  const hoursSeries = allActivities.map(a => a.hours);
   const hasAnyData = hoursSeries.some((v) => v > 0);
 
   return (
@@ -132,55 +126,80 @@ export default function Progress() {
                 <CardTitle>Activity Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                  <span className="font-medium text-red-900">Boxing</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold text-red-700">{boxing.totalHours}h</span>
-                    <span className="inline-flex items-center rounded-full bg-red-100 text-red-800 px-2.5 py-0.5 text-xs font-medium">Level {boxingLevel}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                  <span className="font-medium text-green-900">Gym</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold text-green-700">{gym.totalHours}h</span>
-                    <span className="inline-flex items-center rounded-full bg-green-100 text-green-800 px-2.5 py-0.5 text-xs font-medium">Level {gymLevel}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                  <span className="font-medium text-purple-900">Oud</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold text-purple-700">{oud.totalHours}h</span>
-                    <span className="inline-flex items-center rounded-full bg-purple-100 text-purple-800 px-2.5 py-0.5 text-xs font-medium">Level {oudLevel}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                  <span className="font-medium text-yellow-900">Spanish</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold text-yellow-700">{spanish.totalHours}h</span>
-                    <span className="inline-flex items-center rounded-full bg-yellow-100 text-yellow-800 px-2.5 py-0.5 text-xs font-medium">Level {spanishLevel}</span>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                  <span className="font-medium text-slate-900">German</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl font-bold text-slate-700">{german.totalHours}h</span>
-                    <span className="inline-flex items-center rounded-full bg-slate-200 text-slate-800 px-2.5 py-0.5 text-xs font-medium">Level {germanLevel}</span>
-                  </div>
-                </div>
-                {customs.map((c) => {
-                  const t = (c as any).template as 'boxing' | 'gym' | 'music' | 'language' | 'none' | undefined;
-                  const hours = c.data.totalHours as number;
-                  const level =
-                    t === 'boxing' ? getBoxingLevel(hours) :
-                    t === 'language' ? getLanguageLevel(hours) :
-                    t === 'music' ? getOudLevel(hours) :
-                    t === 'gym' ? getOudLevel(hours) : 1;
+                {/* Unified activities list - core activities (excluding hidden) + custom activities */}
+                {allActivities.map((activity, index) => {
+                  // Find if this is a core activity
+                  const coreActivity = coreActivities.find(c => c.name === activity.name);
+                  const isCore = !!coreActivity;
+                  
+                  // Get styling based on activity type
+                  const getActivityStyle = (name: string, isCore: boolean) => {
+                    if (isCore) {
+                      switch (name) {
+                        case 'Boxing': return { bg: 'bg-red-50', text: 'text-red-900', boldText: 'text-red-700', badge: 'bg-red-100 text-red-800' };
+                        case 'Gym': return { bg: 'bg-green-50', text: 'text-green-900', boldText: 'text-green-700', badge: 'bg-green-100 text-green-800' };
+                        case 'Oud': return { bg: 'bg-purple-50', text: 'text-purple-900', boldText: 'text-purple-700', badge: 'bg-purple-100 text-purple-800' };
+                        case 'Spanish': return { bg: 'bg-yellow-50', text: 'text-yellow-900', boldText: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-800' };
+                        case 'German': return { bg: 'bg-slate-50', text: 'text-slate-900', boldText: 'text-slate-700', badge: 'bg-slate-200 text-slate-800' };
+                        default: return { bg: 'bg-indigo-50', text: 'text-indigo-900', boldText: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-800' };
+                      }
+                    }
+                    return { bg: 'bg-indigo-50', text: 'text-indigo-900', boldText: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-800' };
+                  };
+
+                  const style = getActivityStyle(activity.name, isCore);
+                  
+                  // Calculate level based on activity type
+                  let level = 1;
+                  if (isCore) {
+                    switch (activity.name) {
+                      case 'Boxing': level = boxingLevel; break;
+                      case 'Gym': level = gymLevel; break;
+                      case 'Oud': level = oudLevel; break;
+                      case 'Spanish': level = spanishLevel; break;
+                      case 'German': level = germanLevel; break;
+                    }
+                  } else {
+                    // Custom activity - find template and calculate level
+                    const customActivity = customs.find(c => c.name === activity.name);
+                    if (customActivity) {
+                      const t = (customActivity as any).template as 'boxing' | 'gym' | 'music' | 'language' | 'none' | undefined;
+                      level = 
+                        t === 'boxing' ? getBoxingLevel(activity.hours) :
+                        t === 'language' ? getLanguageLevel(activity.hours) :
+                        t === 'music' ? getOudLevel(activity.hours) :
+                        t === 'gym' ? getOudLevel(activity.hours) : 1;
+                    }
+                  }
+                  
                   return (
-                    <div key={c.slug} className="flex justify-between items-center p-3 bg-indigo-50 rounded-lg">
-                      <span className="font-medium text-indigo-900">{c.name}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xl font-bold text-indigo-700">{hours}h</span>
-                        <span className="inline-flex items-center rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-0.5 text-xs font-medium">Level {level}</span>
+                    <div key={`${isCore ? 'core' : 'custom'}-${activity.name}`} className={`flex justify-between items-center p-3 ${style.bg} rounded-lg`}>
+                      <span className={`font-medium ${style.text}`}>{activity.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 w-6 p-0" 
+                          aria-label={`Edit ${activity.name} hours`} 
+                          title="Edit total hours" 
+                          onClick={() => {
+                            if (isCore) {
+                              const key = coreActivity!.key;
+                              setEditTarget({ type: 'core', key });
+                              setManualTotal(activity.hours.toString());
+                            } else {
+                              const customActivity = customs.find(c => c.name === activity.name);
+                              if (customActivity) {
+                                setEditTarget({ type: 'custom', key: customActivity.slug });
+                                setManualTotal(activity.hours.toString());
+                              }
+                            }
+                          }}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <span className={`text-xl font-bold ${style.boldText}`}>{activity.hours}h</span>
+                        <span className={`inline-flex items-center rounded-full ${style.badge} px-2.5 py-0.5 text-xs font-medium`}>Level {level}</span>
                       </div>
                     </div>
                   );
@@ -195,14 +214,7 @@ export default function Progress() {
               <CardContent>
                 <div className="text-center">
                   <div className="text-4xl font-bold text-gray-900">
-                    {[
-                      boxing.totalHours,
-                      gym.totalHours,
-                      oud.totalHours,
-                      spanish.totalHours,
-                      german.totalHours,
-                      ...customs.map((c) => c.data.totalHours),
-                    ].reduce((a, b) => a + b, 0)}h
+                    {allActivities.reduce((total, activity) => total + activity.hours, 0)}h
                   </div>
                   <p className="text-gray-600 mt-2">Total hours across all activities</p>
                   
@@ -210,32 +222,17 @@ export default function Progress() {
                     <div className="flex justify-between text-sm">
                       <span>Most Active</span>
                       <span className="font-medium">
-                        {(() => {
-                          const base: Array<[string, number]> = [
-                            ['Boxing', boxing.totalHours],
-                            ['Gym', gym.totalHours],
-                            ['Oud', oud.totalHours],
-                            ['Spanish', spanish.totalHours],
-                            ['German', german.totalHours],
-                          ];
-                          const pairs: Array<[string, number]> = base.concat(
-                            customs.map((c) => [c.name, c.data.totalHours] as [string, number])
-                          );
-                          return pairs.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
-                        })()}
+                        {allActivities.length > 0 
+                          ? allActivities.reduce((a, b) => (b.hours > a.hours ? b : a)).name
+                          : 'None'}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Average per Activity</span>
                       <span className="font-medium">
-                        {Math.round(([
-                          boxing.totalHours,
-                          gym.totalHours,
-                          oud.totalHours,
-                          spanish.totalHours,
-                          german.totalHours,
-                          ...customs.map((c) => c.data.totalHours),
-                        ].reduce((a, b) => a + b, 0)) / (5 + customs.length))}h
+                        {allActivities.length > 0 
+                          ? Math.round(allActivities.reduce((total, activity) => total + activity.hours, 0) / allActivities.length)
+                          : 0}h
                       </span>
                     </div>
                   </div>
@@ -245,6 +242,31 @@ export default function Progress() {
           </div>
         </div>
       </div>
+      {/* Edit total hours dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(o) => { if (!o) { setEditTarget(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Total Hours</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Hours</label>
+              <Input type="number" value={manualTotal} onChange={(e) => setManualTotal(e.target.value)} min={0} step="0.01" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+              <Button onClick={() => {
+                const val = parseFloat(manualTotal);
+                if (Number.isFinite(val) && val >= 0 && editTarget) {
+                  if (editTarget.type === 'core') setActivityTotalHours(editTarget.key as any, val);
+                  else setCustomActivityTotalHours(editTarget.key, val);
+                  setEditTarget(null);
+                }
+              }}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -30,18 +30,9 @@ interface ActivityData {
   draws?: number;
   // Oud-specific optional fields
   totalConcerts?: number;
-  // Daily goal tracking
-  dailyGoalMinutes?: number;
-  todayMinutes?: number;
-  todayDate?: string;
-  // Language-specific: number of books read
-  booksRead?: number;
 }
 
 interface ActivityStore {
-  // Language books read
-  setBooksRead: (activity: 'spanish' | 'german', count: number) => void;
-  setCustomBooksRead: (slug: string, count: number) => void;
   boxing: ActivityData;
   gym: ActivityData;
   oud: ActivityData;
@@ -107,12 +98,6 @@ interface ActivityStore {
   restoreActivity: (key: 'boxing' | 'gym' | 'oud' | 'violin' | 'spanish' | 'german') => void;
   // Manual edits
   setActivityTotalHours: (activity: 'boxing' | 'gym' | 'oud' | 'violin' | 'spanish' | 'german', hours: number) => void;
-  setCustomActivityTotalHours: (slug: string, hours: number) => void;
-  // Daily goal methods
-  setDailyGoal: (activity: 'boxing' | 'oud' | 'violin' | 'spanish' | 'german', minutes: number) => void;
-  setCustomDailyGoal: (slug: string, minutes: number) => void;
-  addTodayMinutes: (activity: 'boxing' | 'oud' | 'violin' | 'spanish' | 'german', minutes: number) => void;
-  addCustomTodayMinutes: (slug: string, minutes: number) => void;
 }
 
 const initialActivityData: ActivityData = {
@@ -120,9 +105,6 @@ const initialActivityData: ActivityData = {
   thisWeekSessions: 0,
   currentStreak: 0,
   lastSession: null,
-  dailyGoalMinutes: 30, // Default 30 minutes
-  todayMinutes: 0,
-  todayDate: new Date().toDateString(),
 };
 
 export const useActivityStore = create<ActivityStore>()(
@@ -144,9 +126,23 @@ export const useActivityStore = create<ActivityStore>()(
         { id: '4', name: 'Minoxidil', category: 'Health' },
         { id: '5', name: 'Creatine', category: 'Health' },
       ],
-      gymExerciseNames: {},
-      gymExerciseCategories: {},
-      gymExerciseProgress: {},
+      gymExerciseNames: {
+        'flat-db-press': 'Flat DB Press',
+        'flat-bpress-machine': 'Flat B-Press Machine',
+        'high-low-cable-fly': 'High to Low Cable Fly',
+        'tri-rope-pushdown': 'Tri Rope Pushdown',
+        'db-lateral-raises': 'DB Lateral Raises',
+        'shoulder-press-machine': 'Shoulder Press Machine',
+      },
+      gymExerciseCategories: {
+        'flat-db-press': 'push',
+        'flat-bpress-machine': 'push',
+        'high-low-cable-fly': 'push',
+        'tri-rope-pushdown': 'push',
+        'db-lateral-raises': 'push',
+        'shoulder-press-machine': 'push',
+      },
+  gymExerciseProgress: {},
       boxing: { 
         ...initialActivityData, 
         totalHours: 96, 
@@ -189,36 +185,8 @@ export const useActivityStore = create<ActivityStore>()(
       },
       oud: { ...initialActivityData, totalHours: 16, thisWeekSessions: 2, currentStreak: 3, totalConcerts: 1 },
   violin: { ...initialActivityData, totalHours: 780, thisWeekSessions: 1, currentStreak: 2, totalConcerts: 5 },
-  spanish: { ...initialActivityData, totalHours: 393, thisWeekSessions: 2, currentStreak: 2, booksRead: 0 },
-  german: { ...initialActivityData, totalHours: 556, thisWeekSessions: 1, currentStreak: 1, booksRead: 0 },
-  setBooksRead: (activity, count) => {
-    set((state) => ({
-      ...state,
-      [activity]: {
-        ...state[activity],
-        booksRead: Math.max(0, Math.floor(count)),
-      },
-    }));
-  },
-  setCustomBooksRead: (slug, count) => {
-    set((state) => {
-      const entry = state.customActivities[slug];
-      if (!entry) return state;
-      return {
-        ...state,
-        customActivities: {
-          ...state.customActivities,
-          [slug]: {
-            ...entry,
-            data: {
-              ...entry.data,
-              booksRead: Math.max(0, Math.floor(count)),
-            },
-          },
-        },
-      };
-    });
-  },
+  spanish: { ...initialActivityData, totalHours: 393, thisWeekSessions: 2, currentStreak: 2 },
+  german: { ...initialActivityData, totalHours: 556, thisWeekSessions: 1, currentStreak: 1 },
       
   addHours: (activity, hours) => {
         set((state) => {
@@ -820,101 +788,10 @@ export const useActivityStore = create<ActivityStore>()(
           } as any;
         });
       },
-      setCustomActivityTotalHours: (slug, hours) => {
-        set((state) => {
-          const entry = state.customActivities[slug];
-          if (!entry) return state;
-            const safe = Number.isFinite(hours) && hours >= 0 ? Math.round(hours * 100) / 100 : entry.data.totalHours;
-          return {
-            ...state,
-            customActivities: {
-              ...state.customActivities,
-              [slug]: { ...entry, data: { ...entry.data, totalHours: safe } },
-            },
-          };
-        });
-      },
-
-      // Daily goal methods
-      setDailyGoal: (activity, minutes) => {
-        set((state) => {
-          const current = state[activity];
-          if (!current) return state as any;
-          const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : 30; // Default to 30 minutes
-          return {
-            ...state,
-            [activity]: {
-              ...current,
-              dailyGoalMinutes: safe,
-            },
-          } as any;
-        });
-      },
-
-      setCustomDailyGoal: (slug, minutes) => {
-        set((state) => {
-          const entry = state.customActivities[slug];
-          if (!entry) return state;
-          const safe = Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
-          return {
-            ...state,
-            customActivities: {
-              ...state.customActivities,
-              [slug]: { ...entry, data: { ...entry.data, dailyGoalMinutes: safe } },
-            },
-          };
-        });
-      },
-
-      addTodayMinutes: (activity, minutes) => {
-        set((state) => {
-          const current = state[activity];
-          if (!current) return state as any;
-          const today = new Date().toDateString();
-          const isToday = current.todayDate === today;
-          const currentMinutes = isToday ? (current.todayMinutes || 0) : 0;
-          const newMinutes = currentMinutes + minutes;
-          
-          return {
-            ...state,
-            [activity]: {
-              ...current,
-              todayMinutes: newMinutes,
-              todayDate: today,
-            },
-          } as any;
-        });
-      },
-
-      addCustomTodayMinutes: (slug, minutes) => {
-        set((state) => {
-          const entry = state.customActivities[slug];
-          if (!entry) return state;
-          const today = new Date().toDateString();
-          const isToday = entry.data.todayDate === today;
-          const currentMinutes = isToday ? (entry.data.todayMinutes || 0) : 0;
-          const newMinutes = currentMinutes + minutes;
-          
-          return {
-            ...state,
-            customActivities: {
-              ...state.customActivities,
-              [slug]: { 
-                ...entry, 
-                data: { 
-                  ...entry.data, 
-                  todayMinutes: newMinutes, 
-                  todayDate: today 
-                } 
-              },
-            },
-          };
-        });
-      },
     }),
     {
     name: 'activity-storage',
-  version: 13,
+  version: 12,
       // Basic migration to ensure optional fields exist and update defaults
       migrate: (persistedState: any, _version: number) => {
         if (!persistedState) return persistedState;
@@ -962,8 +839,8 @@ export const useActivityStore = create<ActivityStore>()(
           state.gym.powerLiftNames = state.gym.powerLiftNames ?? ['Squats','Bench Press','Rows / Lat Pulldowns','Hip Thrusts'];
           state.gym.powerLiftWeights = state.gym.powerLiftWeights ?? [100, 50, 50, 50];
           state.gym.weightTrend = state.gym.weightTrend ?? [];
-          // Set minimum total hours to 24 if lower or uninitialized
-          if (typeof state.gym.totalHours !== 'number' || state.gym.totalHours < 24) {
+          // Force default total hours to 24 if lower or uninitialized
+          if (typeof state.gym.totalHours !== 'number' || state.gym.totalHours !== 24) {
             state.gym.totalHours = 24;
           }
         }
@@ -979,95 +856,23 @@ export const useActivityStore = create<ActivityStore>()(
           const cats = ['Learning','Learning','Music','Health','Health'];
           state.dailyActivityList = (state.dailyActivityNames as string[]).map((n, i) => ({ id: String(i+1), name: n, category: cats[i] || 'General' }));
         }
-        // Initialize gym exercises if empty (unified system)
-        state.gymExerciseNames = state.gymExerciseNames ?? {};
-        state.gymExerciseCategories = state.gymExerciseCategories ?? {};
+        state.gymExerciseNames = state.gymExerciseNames ?? {
+          'flat-db-press': 'Flat DB Press',
+          'flat-bpress-machine': 'Flat B-Press Machine',
+          'high-low-cable-fly': 'High to Low Cable Fly',
+          'tri-rope-pushdown': 'Tri Rope Pushdown',
+          'db-lateral-raises': 'DB Lateral Raises',
+          'shoulder-press-machine': 'Shoulder Press Machine',
+        };
+        state.gymExerciseCategories = state.gymExerciseCategories ?? {
+          'flat-db-press': 'push',
+          'flat-bpress-machine': 'push',
+          'high-low-cable-fly': 'push',
+          'tri-rope-pushdown': 'push',
+          'db-lateral-raises': 'push',
+          'shoulder-press-machine': 'push',
+        };
         state.gymExerciseProgress = state.gymExerciseProgress ?? {};
-        
-        // Add default exercises if none exist
-        if (Object.keys(state.gymExerciseNames).length === 0) {
-          // Push exercises
-          const pushExercises = [
-            ['flat-db-press', 'Flat DB Press'],
-            ['flat-bpress-machine', 'Flat B-Press Machine'],
-            ['incline-db-press', 'Incline DB Press'],
-            ['incline-bpress-machine', 'Incline B-Press Machine'],
-            ['high-low-cable-fly', 'High to Low Cable Fly'],
-            ['tri-rope-pushdown', 'Tri Rope Pushdown'],
-            ['overhead-cable-bar-extensions', 'Overhead Cable Bar Extensions'],
-            ['db-lateral-raises', 'DB Lateral Raises'],
-            ['cable-lateral-raises', 'Cable Lateral Raises'],
-            ['shoulder-press-machine', 'Shoulder Press Machine'],
-          ];
-          // Pull exercises
-          const pullExercises = [
-            ['wide-lat-pulldown', 'Wide Lat Pulldown'],
-            ['narrow-seated-rows', 'Narrow Seated Rows'],
-            ['wide-seated-rows', 'Wide Seated Rows'],
-            ['rope-face-pulls', 'Rope Face Pulls'],
-            ['sa-cable-rear-delt-fly', 'SA Cable Rear Delt Fly'],
-            ['bar-curls', 'Bar Curls'],
-            ['db-preacher-curl', 'DB Preacher Curl'],
-            ['behind-back-cable-curls', 'Behind Back Cable Curls'],
-            ['rope-bicep-curl', 'Rope Bicep Curl'],
-            ['cable-bar-shrugs', 'Cable Bar Shrugs'],
-          ];
-          // Leg exercises
-          const legExercises = [
-            ['romanian-deadlift', 'Romanian Deadlift'],
-            ['bar-squat', 'Bar Squat'],
-            ['hack-squat', 'Hack Squat'],
-            ['single-leg-press', 'Single Leg Press'],
-            ['leg-extensions', 'Leg Extensions'],
-            ['seated-leg-curls', 'Seated Leg Curls'],
-            ['bar-hip-thrust', 'Bar Hip Thrust'],
-            ['seated-adduction-machine', 'Seated Adduction Machine'],
-          ];
-          
-          // Add all exercises with categories
-          [...pushExercises.map(e => [...e, 'push']), 
-           ...pullExercises.map(e => [...e, 'pull']), 
-           ...legExercises.map(e => [...e, 'legs'])].forEach(([id, name, cat]) => {
-            state.gymExerciseNames[id] = name;
-            state.gymExerciseCategories[id] = cat;
-          });
-          
-          // Add session data from your workout
-          const sessionData = [
-            ['flat-db-press', 25, 8],
-            ['flat-bpress-machine', 50, 9],
-            ['incline-db-press', 25, 8],
-            ['incline-bpress-machine', 55, 10],
-            ['high-low-cable-fly', 25, 9],
-            ['tri-rope-pushdown', 45, 9],
-            ['overhead-cable-bar-extensions', 40, 9],
-            ['db-lateral-raises', 10, 10],
-            ['cable-lateral-raises', 10, 8],
-            ['shoulder-press-machine', 25, 8],
-            ['wide-lat-pulldown', 54, 10],
-            ['narrow-seated-rows', 60, 7],
-            ['wide-seated-rows', 80, 7],
-            ['rope-face-pulls', 60, 8],
-            ['bar-curls', 20, 9],
-            ['db-preacher-curl', 10, 7],
-            ['behind-back-cable-curls', 50, 10],
-            ['rope-bicep-curl', 25, 10],
-            ['cable-bar-shrugs', 50, 10],
-            ['bar-squat', 100, 9],
-            ['hack-squat', 70, 10],
-            ['single-leg-press', 40, 10],
-            ['leg-extensions', 75, 10],
-            ['seated-leg-curls', 35, 10],
-            ['bar-hip-thrust', 35, 12],
-            ['seated-adduction-machine', 100, 10],
-          ];
-          
-          sessionData.forEach(([id, weight, reps]) => {
-            if (state.gymExerciseNames[id]) {
-              state.gymExerciseProgress[id] = [{ date: '9/26', weight, reps, ts: Date.now() }];
-            }
-          });
-        }
   state.hiddenActivities = state.hiddenActivities ?? {};
         if (state.oud) {
           if (typeof state.oud.totalHours === 'number' && state.oud.totalHours < 16) {
@@ -1086,42 +891,12 @@ export const useActivityStore = create<ActivityStore>()(
             state.violin.totalHours = 780;
           }
         }
-        if (!state.spanish) {
-          state.spanish = { ...initialActivityData, totalHours: 393, thisWeekSessions: 2, currentStreak: 2 };
-        } else if (typeof state.spanish.totalHours !== 'number' || state.spanish.totalHours < 393) {
+        if (state.spanish && typeof state.spanish.totalHours === 'number' && state.spanish.totalHours < 393) {
           state.spanish.totalHours = 393;
         }
-        if (!state.german) {
-          state.german = { ...initialActivityData, totalHours: 556, thisWeekSessions: 1, currentStreak: 1 };
-        } else if (typeof state.german.totalHours !== 'number' || state.german.totalHours < 556) {
+        if (state.german && typeof state.german.totalHours === 'number' && state.german.totalHours < 556) {
           state.german.totalHours = 556;
         }
-
-        // Migration for daily goal fields (added in version 13)
-        const today = new Date().toDateString();
-        const addDailyGoalDefaults = (activity: any) => {
-          if (activity) {
-            activity.dailyGoalMinutes = activity.dailyGoalMinutes ?? 30;
-            activity.todayMinutes = activity.todayMinutes ?? 0;
-            activity.todayDate = activity.todayDate ?? today;
-          }
-        };
-
-        // Add daily goal defaults to all core activities
-        addDailyGoalDefaults(state.boxing);
-        addDailyGoalDefaults(state.gym);
-        addDailyGoalDefaults(state.oud);
-        addDailyGoalDefaults(state.violin);
-        addDailyGoalDefaults(state.spanish);
-        addDailyGoalDefaults(state.german);
-
-        // Add daily goal defaults to all custom activities
-        Object.values(state.customActivities || {}).forEach((entry: any) => {
-          if (entry?.data) {
-            addDailyGoalDefaults(entry.data);
-          }
-        });
-
         return state;
       },
     }

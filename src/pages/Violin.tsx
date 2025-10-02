@@ -3,14 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useActivityStore } from '@/lib/activityStore';
-import { Music2, Clock, Plus, Target, Flame } from 'lucide-react';
+import { Music2, Clock, Plus, Target, Flame, Edit2 } from 'lucide-react';
 import Levels from '@/components/Levels';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function Violin() {
   const [showAddHours, setShowAddHours] = useState(false);
   const [hoursToAdd, setHoursToAdd] = useState('');
-  const { violin, addHours } = useActivityStore();
+  const [editTotalOpen, setEditTotalOpen] = useState(false);
+  const [manualTotal, setManualTotal] = useState('');
+  const { violin, addHours, setActivityTotalHours } = useActivityStore();
 
   // Derive level using provided violin thresholds
   const violinLevel =
@@ -28,6 +30,14 @@ export default function Violin() {
       addHours('violin', hours);
       setHoursToAdd('');
       setShowAddHours(false);
+    }
+  };
+
+  const handleEditTotal = () => {
+    const hours = parseFloat(manualTotal);
+    if (hours >= 0) {
+      setActivityTotalHours('violin', hours);
+      setEditTotalOpen(false);
     }
   };
 
@@ -85,7 +95,20 @@ export default function Violin() {
             <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-indigo-500 opacity-5" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              <Music2 className="h-4 w-4 text-violet-600" />
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setManualTotal(violin.totalHours.toString());
+                    setEditTotalOpen(true);
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </Button>
+                <Music2 className="h-4 w-4 text-violet-600" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{violin.totalHours}h</div>
@@ -137,6 +160,36 @@ export default function Violin() {
           </div>
         </div>
       </div>
+      
+      {/* Edit Total Hours Dialog */}
+      <Dialog open={editTotalOpen} onOpenChange={setEditTotalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Total Hours</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Total Hours</label>
+              <Input
+                type="number"
+                value={manualTotal}
+                onChange={(e) => setManualTotal(e.target.value)}
+                placeholder="Enter total hours"
+                step="0.01"
+                min="0"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setEditTotalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditTotal}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DataManager } from '@/components/DataManager';
 import { Settings as SettingsIcon, User, Bell, Database, Trash2, Download } from 'lucide-react';
 
 export default function Settings() {
@@ -161,6 +162,9 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Data Management */}
+          <DataManager />
         </div>
       </div>
     </div>

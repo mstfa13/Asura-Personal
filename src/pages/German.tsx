@@ -3,14 +3,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useActivityStore } from '@/lib/activityStore';
-import { Languages, Clock, Plus, Target, Flame } from 'lucide-react';
+import { Languages, Clock, Plus, Target, Flame, Edit2 } from 'lucide-react';
 import Levels from '@/components/Levels';
+import { DailyGoalGauge } from '@/components/DailyGoalGauge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 export default function German() {
   const [showAddHours, setShowAddHours] = useState(false);
   const [hoursToAdd, setHoursToAdd] = useState('');
-  const { german, addHours } = useActivityStore();
+  const [editTotalOpen, setEditTotalOpen] = useState(false);
+  const [manualTotal, setManualTotal] = useState('');
+  const { german, addHours, setActivityTotalHours } = useActivityStore();
+  const setDailyGoal = useActivityStore((s) => s.setDailyGoal);
+  const addTodayMinutes = useActivityStore((s) => s.addTodayMinutes);
   // Derive current level from hours using language thresholds similar to Levels component
   const germanLevel = german.totalHours >= 1000
     ? 7
@@ -30,6 +35,14 @@ export default function German() {
       addHours('german', hours);
       setHoursToAdd('');
       setShowAddHours(false);
+    }
+  };
+
+  const handleEditTotal = () => {
+    const hours = parseFloat(manualTotal);
+    if (hours >= 0) {
+      setActivityTotalHours('german', hours);
+      setEditTotalOpen(false);
     }
   };
 
@@ -89,7 +102,20 @@ export default function German() {
             <div className="absolute inset-0 bg-gradient-to-r from-slate-600 to-gray-900 opacity-5" />
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              <Languages className="h-4 w-4 text-slate-700" />
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setManualTotal(german.totalHours.toString());
+                    setEditTotalOpen(true);
+                  }}
+                  className="h-6 w-6 p-0"
+                >
+                  <Edit2 className="h-3 w-3" />
+                </Button>
+                <Languages className="h-4 w-4 text-slate-700" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold">{german.totalHours}h</div>
@@ -135,14 +161,54 @@ export default function German() {
         </div>
       </div>
 
-      {/* Levels - Language template (spans two cards) */}
+      {/* Levels and Daily Goal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="md:col-span-2 lg:col-span-2">
             <Levels variant="language" currentLevel={germanLevel} />
           </div>
+          <div className="md:col-span-2 lg:col-span-2">
+            <DailyGoalGauge
+              currentHours={german.totalHours}
+              dailyGoalMinutes={german.dailyGoalMinutes || 30}
+              todayMinutes={german.todayDate === new Date().toDateString() ? (german.todayMinutes || 0) : 0}
+              onUpdateDailyGoal={(minutes) => setDailyGoal('german', minutes)}
+              onUpdateTodayMinutes={(minutes) => addTodayMinutes('german', minutes - (german.todayDate === new Date().toDateString() ? (german.todayMinutes || 0) : 0))}
+              variant="language"
+            />
+          </div>
         </div>
       </div>
+      
+      {/* Edit Total Hours Dialog */}
+      <Dialog open={editTotalOpen} onOpenChange={setEditTotalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Total Hours</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Total Hours</label>
+              <Input
+                type="number"
+                value={manualTotal}
+                onChange={(e) => setManualTotal(e.target.value)}
+                placeholder="Enter total hours"
+                step="0.01"
+                min="0"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setEditTotalOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditTotal}>
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
